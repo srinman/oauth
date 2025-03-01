@@ -5,6 +5,7 @@
   <title>OAuth Dashboard</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
+    /* Hide Logout and Dashboard buttons until a user is signed in */
     #logout-btn, #dashboard-btn {
       display: none;
     }
@@ -14,10 +15,10 @@
   <!-- Display a title on top of the page -->
   <h1 style="text-align:center;">Welcome to Scenario1 App</h1>
 
-  <!-- When not logged in, only this container is visible -->
+  <!-- Sign-In container (visible when not signed in) -->
   <div id="google-signin-button" style="margin-top:10px;"></div>
 
-  <!-- When logged in, these buttons will be displayed -->
+  <!-- These buttons are shown after a successful sign in -->
   <button id="logout-btn">Logout</button>
   <button id="dashboard-btn">Dashboard</button>
   <div id="user-info"></div>
@@ -26,34 +27,32 @@
     let isAuthenticated = false;
     let authToken = null;
 
-    // Initialize Google Identity Services
+    // Initialize Google Identity Services when the window loads.
     window.onload = function() {
       google.accounts.id.initialize({
         client_id: "573154595273-f5anosm6qld1mg1vgqqiv7rdvvp5p6sm.apps.googleusercontent.com",
         callback: handleCredentialResponse
       });
-      // Render the Google Sign-In button within our container.
+      // Render the Google Sign-In button.
       google.accounts.id.renderButton(
           document.getElementById('google-signin-button'),
           { theme: "outline", size: "large" }
       );
     };
 
-    // Callback function triggered after Google sign-in.
+    // Callback function triggered after a successful Google sign-in.
     function handleCredentialResponse(response) {
       authToken = response.credential;
       isAuthenticated = true;
       
-      // Decode token payload to extract user info.
+      // Decode the ID token's payload.
       const payload = JSON.parse(atob(authToken.split('.')[1]));
       const userName = payload.name || payload.email;
       
-      // Hide the sign-in button container.
+      // Update UI: hide the sign-in button and show Logout and Dashboard buttons.
       document.getElementById('google-signin-button').style.display = 'none';
-      // Show Logout and Dashboard buttons.
       document.getElementById('logout-btn').style.display = 'inline-block';
       document.getElementById('dashboard-btn').style.display = 'inline-block';
-      // Optionally update Logout button text to include the username.
       document.getElementById('logout-btn').textContent = 'Logout ' + userName;
     }
     window.handleCredentialResponse = handleCredentialResponse;
@@ -63,12 +62,10 @@
       // Reset authentication state.
       isAuthenticated = false;
       authToken = null;
-      // Clear any displayed user info.
       document.getElementById('user-info').innerHTML = '';
-      // Hide Logout and Dashboard buttons.
       document.getElementById('logout-btn').style.display = 'none';
       document.getElementById('dashboard-btn').style.display = 'none';
-      // Re-render the Google Sign-In button:
+      // Re-render the Google Sign-In button.
       document.getElementById('google-signin-button').style.display = 'block';
       google.accounts.id.renderButton(
           document.getElementById('google-signin-button'),
@@ -76,7 +73,7 @@
       );
     });
 
-    // Dashboard button: calls the Python API and displays returned JSON.
+    // Dashboard button: fetches user info from the backend and displays it.
     document.getElementById('dashboard-btn').addEventListener('click', function() {
       if (!isAuthenticated) {
         alert('You must be logged in to access the dashboard.');
@@ -88,7 +85,14 @@
       })
       .then(response => {
         if (!response.ok) {
-          throw new Error('Error fetching dashboard information');
+          // Differentiate the error message by the response status code.
+          if (response.status === 401) {
+              throw new Error("User not authenticated. Please log in again.");
+          } else if (response.status === 403) {
+              throw new Error("User authenticated but not registered.");
+          } else {
+              throw new Error("Error fetching dashboard information. (Status: " + response.status + ")");
+          }
         }
         return response.json();
       })
