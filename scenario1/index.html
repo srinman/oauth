@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OAuth Dashboard</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <button id="login-btn">Login with Google</button>
+  <button id="dashboard-btn">Dashboard</button>
+  <div id="user-info"></div>
+  <!-- Container where the Google button can be rendered -->
+  <div id="google-signin-button" style="margin-top:10px;"></div>
+
+  <script>
+    let isAuthenticated = false;
+    let authToken = null;
+
+    // Initialize Google Identity Services
+    window.onload = function() {
+      google.accounts.id.initialize({
+        client_id: "573154595273-f5anosm6qld1mg1vgqqiv7rdvvp5p6sm.apps.googleusercontent.com",
+        callback: handleCredentialResponse
+      });
+      // Optionally render a visible button for sign-in:
+      google.accounts.id.renderButton(
+          document.getElementById('google-signin-button'),
+          { theme: "outline", size: "large" }
+      );
+    };
+
+    // Callback function triggered after Google sign-in.
+    function handleCredentialResponse(response) {
+      authToken = response.credential;
+      isAuthenticated = true;
+      
+      // Decode token payload to extract user info.
+      const payload = JSON.parse(atob(authToken.split('.')[1]));
+      const userName = payload.name || payload.email;
+      
+      document.getElementById('login-btn').textContent = 'logout ' + userName;
+      // Optionally clear the rendered sign-in button
+      document.getElementById('google-signin-button').innerHTML = '';
+    }
+    window.handleCredentialResponse = handleCredentialResponse;
+
+    // Toggle login / logout on button click.
+    document.getElementById('login-btn').addEventListener('click', function() {
+      if (!isAuthenticated) {
+        // You can either use the One Tap prompt...
+        // google.accounts.id.prompt();
+
+        // ...or simulate a click on the rendered button for testing.
+        document.getElementById('google-signin-button').click();
+      } else {
+        // Logout process: clear token and update UI.
+        isAuthenticated = false;
+        authToken = null;
+        this.textContent = 'Login with Google';
+        document.getElementById('user-info').innerHTML = '';
+        // Re-render the Google sign-in button.
+        google.accounts.id.renderButton(
+            document.getElementById('google-signin-button'),
+            { theme: "outline", size: "large" }
+        );
+      }
+    });
+
+    // Dashboard button: calls the Python API and displays returned JSON.
+    document.getElementById('dashboard-btn').addEventListener('click', function() {
+      if (!isAuthenticated) {
+        alert('You must be logged in to access the dashboard.');
+        return;
+      }
+      fetch('/api/dashboard', {
+        method: 'GET',
+        headers: { 'Authorization': authToken }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Error fetching dashboard information');
+        }
+        return response.json();
+      })
+      .then(data => {
+        displayUserInfo(data);
+      })
+      .catch(error => {
+        alert(error.message);
+      });
+    });
+
+    // Display the JSON payload in a formatted <pre> block.
+    function displayUserInfo(data) {
+      document.getElementById('user-info').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    }
+  </script>
+</body>
+</html>
