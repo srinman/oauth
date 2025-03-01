@@ -191,6 +191,37 @@ if __name__ == '__main__':
 
 ---
 
+## Creating the Google OAuth Client
+
+Follow these steps to create a Client ID in the Google Cloud Console:
+
+1. **Go to Google Cloud Console:**
+   - Open your browser and navigate to [Google Cloud Console](https://console.cloud.google.com/).
+
+2. **Create or Select a Project:**
+   - Click on **Select a project**. If you don’t have one, click **New Project**, give it a name, and click **Create**.
+   - Alternatively, select an existing project.
+
+3. **Configure the OAuth Consent Screen:**
+   - In the sidebar, navigate to **APIs & Services > OAuth consent screen**.
+   - Choose **External** (if your app is public) or **Internal**.
+   - Enter the required information (App name, support email, etc.) and click **Save and Continue**.
+
+4. **Create OAuth Client Credentials:**
+   - Go to **APIs & Services > Credentials**.
+   - Click **Create Credentials** and select **OAuth client ID**.
+   - Choose **Web application** as the application type.
+   - Under **Authorized JavaScript origins**, add your application's origin (e.g. `http://localhost:8000`).
+   - Under **Authorized redirect URIs,** add the URI where your app will handle OAuth responses (if applicable, e.g. `http://localhost:8000/callback`).  
+     *Note:* For the direct ID token flow shown here, a redirect URI is not typically required.
+   - Click **Create**. Your Client ID (and Client Secret, if needed) will be generated.
+   - Replace the `client_id` value in your `index.html` with this new Client ID.
+
+5. **Final Check:**
+   - Ensure that the **Authorized JavaScript origins** exactly match the origin from which your HTML is served (e.g. `http://localhost:8000`).
+
+---
+
 ## Running the App
 
 1. **Install Dependencies:**
@@ -209,8 +240,8 @@ if __name__ == '__main__':
    - This serves your `index.html` at [http://localhost:8000](http://localhost:8000).
 
 3. **Run the Flask Backend:**
-    In python program, change one of the email address to your email address.  For eg. user5@example.com to your email address (Google).
-   - In a separate terminal, run:
+    In python program, change one of the email addresses to your email address (e.g., update `user5@example.com` to your own Google email).
+   - Open a separate terminal and run:
    
      ```bash
      python app.py
@@ -221,6 +252,6 @@ if __name__ == '__main__':
 4. **Test the Workflow:**
    - Open your browser and navigate to [http://localhost:8000](http://localhost:8000).
    - Click the rendered Google Sign-In button to log in.
-   - Once logged in, use the Dashboard button to fetch and display your protected user information from the backend.
+   - Once logged in, click the Dashboard button to fetch and display your protected user information from the backend.
 
-   This setup allows you to see how the direct ID token flow works in practice, with a simple user interface and a backend that verifies the token and serves user-specific data. It uses a trusted third-party identity provider (Google) to authenticate users and a custom backend to manage user data securely.
+This setup demonstrates how the direct ID token flow works in practice using Google Identity Services, with a simple user interface and a backend that verifies the token and serves user-specific data.
