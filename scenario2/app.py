@@ -37,8 +37,8 @@ registered_users = {
 }
 
 # Microsoft EntraID configuration -- update these with your actual values.
-TENANT_ID = "YOUR_TENANT_ID"
-MICROSOFT_CLIENT_ID = "YOUR_MICROSOFT_CLIENT_ID"
+TENANT_ID = "abc-ecf4-454a-9a69-def"
+MICROSOFT_CLIENT_ID = "abc-2eb5-435c-be74-def"
 DISCOVERY_URL = f"https://login.microsoftonline.com/{TENANT_ID}/v2.0/.well-known/openid-configuration"
 config = requests.get(DISCOVERY_URL).json()
 jwks_uri = config["jwks_uri"]

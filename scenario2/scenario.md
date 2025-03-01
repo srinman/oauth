@@ -3,7 +3,10 @@
 This application demonstrates a direct ID token flow using Microsoft EntraID (Azure AD) for authentication with a JavaScript front end and a Flask backend for serving protected user information. The app consists of two main parts:
 
 - **Client-Side (index.html):** Uses the MSAL.js library to sign in users via Microsoft EntraID.
-- **Server-Side (app.py):** A Flask app that verifies the Microsoft ID token and returns static user data if the user is registered.
+- **Server-Side (app.py):** A Flask app that verifies the Microsoft ID token and (if needed) access tokens and returns static user data if the user is registered.
+
+> **Why It Works with This Config:**  
+> Microsoft EntraID requires that Single-Page Applications (SPA) are registered as such in Azure. In a SPA registration, the configured settings enable both access tokens and ID tokens and use the OAuth 2.0 Authorization Code Flow with PKCE for enhanced security. This differs from Google Identity Services where the flow and configuration differ (for example, Google uses its proprietary token verification and button rendering). With MS EntraID, enabling SPA configuration with both tokens provides the client with sufficient credentials to securely call your backend API and also display user information.
 
 ---
 
@@ -12,7 +15,7 @@ This application demonstrates a direct ID token flow using Microsoft EntraID (Az
 Below is the complete updated `index.html` code:
 
 ```html
-<!-- filepath: /home/srinman/git/oauth/scenario1/index.html -->
+<!-- filepath: /home/srinman/git/oauth/scenario2/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -44,15 +47,22 @@ Below is the complete updated `index.html` code:
         clientId: "YOUR_MICROSOFT_CLIENT_ID",
         authority: "https://login.microsoftonline.com/YOUR_TENANT_ID",
         redirectUri: "http://localhost:8000"
+      },
+      cache: {
+        cacheLocation: "sessionStorage",
+        storeAuthStateInCookie: false
       }
     };
 
+    // Instantiate the MSAL instance.
     const msalInstance = new msal.PublicClientApplication(msalConfig);
     let idToken = null;
 
     // Sign in using a popup.
     function signIn() {
-      msalInstance.loginPopup().then((loginResponse) => {
+      msalInstance.loginPopup({
+        scopes: ["openid", "profile", "offline_access"]
+      }).then((loginResponse) => {
         idToken = loginResponse.idToken;
         // Update the UI: hide the sign-in button, show logout and dashboard.
         document.getElementById('ms-signin-button').style.display = 'none';
@@ -116,7 +126,7 @@ Below is the complete updated `index.html` code:
 Below is the updated `app.py` code that verifies the Microsoft EntraID token using PyJWT and the JWKS published by Microsoft:
 
 ```python
-# filepath: /home/srinman/git/oauth/scenario1/app.py
+# filepath: /home/srinman/git/oauth/scenario2/app.py
 from flask import Flask, jsonify, request, abort
 from flask_cors import CORS
 import jwt
@@ -211,30 +221,27 @@ Follow these steps to create an OAuth client for Microsoft EntraID in the Azure 
    - Click on **New registration**.
    - Enter a name for your application (e.g., "Scenario1 App").
    - Choose the supported account types (for example, **Accounts in this organizational directory only** or **Accounts in any organizational directory**).
-   - In the **Redirect URI** section, select **Web** and enter your application's redirect URI. For the direct ID token flow or if you plan to use a redirect, you might use:
-     ```
-     http://localhost:8000
-     ```
-     or if you want a specific callback URI:
-     ```
-     http://localhost:8000/callback
-     ```
-   - Click **Register**.
+   - **Platform Configuration:**  
+     - Under **Platform configurations**, choose **Single-Page Application (SPA)**.
+     - In the **Redirect URI** section, enter:
+       ```
+       http://localhost:8000
+       ```
+     - Click **Configure**.
 
 4. **Configure Authentication Settings:**
-   - After registration, navigate to the **Authentication** blade.
-   - Under **Platform configurations**, ensure that the Redirect URI you provided is listed.
-   - If needed, add additional redirect URIs.
-   - Enable **ID tokens** (used for implicit and hybrid flows) by checking the appropriate box.
-   - Click **Save** if you make changes.
+   - After configuring the SPA platform, on the **Authentication** blade, ensure that:
+     - **Access tokens** and **ID tokens** are enabled (check both boxes).
+     - The listed Redirect URI exactly matches the one from your msalConfig.
+   - Click **Save** if any changes are made.
 
 5. **Obtain Client and Tenant IDs:**
    - On the **Overview** page of your app registration, note the **Application (client) ID** and **Directory (tenant) ID**.
    - Replace the placeholders `YOUR_MICROSOFT_CLIENT_ID` and `YOUR_TENANT_ID` in your `index.html` and `app.py` files with these values.
 
 6. **Final Check:**
-   - Ensure that the **Redirect URI** and any necessary settings match the URLs you are using to serve your app.
-   - Verify that your app's configuration in the Azure portal aligns with your test environment (e.g., `http://localhost:8000`).
+   - Double-check that the **Redirect URI** and other settings match the URLs you are using (e.g., `http://localhost:8000`).
+   - Verify that your app's Azure configuration aligns with your test environment.
 
 ---
 
@@ -265,10 +272,10 @@ Follow these steps to create an OAuth client for Microsoft EntraID in the Azure 
    - The Flask app will run on [http://localhost:5000](http://localhost:5000).
 
 4. **Test the Workflow:**
-   - Visit [http://localhost:8000](http://localhost:8000).
+   - Open your browser and navigate to [http://localhost:8000](http://localhost:8000).
    - Click the **Login with Microsoft** button to sign in.
    - After signing in, click the **Dashboard** button to fetch and display your protected user information.
 
 ---
 
-This complete update demonstrates the scenario using Microsoft EntraID. Remember to replace all placeholder values (such as `YOUR_MICROSOFT_CLIENT_ID` and `YOUR_TENANT_ID`) with actual values from your Azure app registration.
+This complete update demonstrates the scenario using Microsoft EntraID configured as a Single-Page Application (SPA), with both access tokens and ID tokens enabled. This configuration works because it leverages the OAuth 2.0 Authorization Code Flow with PKCE, ideal for SPAs, and securely obtains tokens that can be used to authenticate requests to your backend—differing from the Google flow which uses a different mechanism and configuration.
