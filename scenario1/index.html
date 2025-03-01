@@ -4,13 +4,23 @@
   <meta charset="UTF-8">
   <title>OAuth Dashboard</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    #logout-btn, #dashboard-btn {
+      display: none;
+    }
+  </style>
 </head>
 <body>
-  <button id="login-btn">Login with Google</button>
+  <!-- Display a title on top of the page -->
+  <h1 style="text-align:center;">Welcome to Scenario1 App</h1>
+
+  <!-- When not logged in, only this container is visible -->
+  <div id="google-signin-button" style="margin-top:10px;"></div>
+
+  <!-- When logged in, these buttons will be displayed -->
+  <button id="logout-btn">Logout</button>
   <button id="dashboard-btn">Dashboard</button>
   <div id="user-info"></div>
-  <!-- Container where the Google button can be rendered -->
-  <div id="google-signin-button" style="margin-top:10px;"></div>
 
   <script>
     let isAuthenticated = false;
@@ -22,7 +32,7 @@
         client_id: "573154595273-f5anosm6qld1mg1vgqqiv7rdvvp5p6sm.apps.googleusercontent.com",
         callback: handleCredentialResponse
       });
-      // Optionally render a visible button for sign-in:
+      // Render the Google Sign-In button within our container.
       google.accounts.id.renderButton(
           document.getElementById('google-signin-button'),
           { theme: "outline", size: "large" }
@@ -38,32 +48,32 @@
       const payload = JSON.parse(atob(authToken.split('.')[1]));
       const userName = payload.name || payload.email;
       
-      document.getElementById('login-btn').textContent = 'logout ' + userName;
-      // Optionally clear the rendered sign-in button
-      document.getElementById('google-signin-button').innerHTML = '';
+      // Hide the sign-in button container.
+      document.getElementById('google-signin-button').style.display = 'none';
+      // Show Logout and Dashboard buttons.
+      document.getElementById('logout-btn').style.display = 'inline-block';
+      document.getElementById('dashboard-btn').style.display = 'inline-block';
+      // Optionally update Logout button text to include the username.
+      document.getElementById('logout-btn').textContent = 'Logout ' + userName;
     }
     window.handleCredentialResponse = handleCredentialResponse;
 
-    // Toggle login / logout on button click.
-    document.getElementById('login-btn').addEventListener('click', function() {
-      if (!isAuthenticated) {
-        // You can either use the One Tap prompt...
-        // google.accounts.id.prompt();
-
-        // ...or simulate a click on the rendered button for testing.
-        document.getElementById('google-signin-button').click();
-      } else {
-        // Logout process: clear token and update UI.
-        isAuthenticated = false;
-        authToken = null;
-        this.textContent = 'Login with Google';
-        document.getElementById('user-info').innerHTML = '';
-        // Re-render the Google sign-in button.
-        google.accounts.id.renderButton(
-            document.getElementById('google-signin-button'),
-            { theme: "outline", size: "large" }
-        );
-      }
+    // Logout button functionality.
+    document.getElementById('logout-btn').addEventListener('click', function() {
+      // Reset authentication state.
+      isAuthenticated = false;
+      authToken = null;
+      // Clear any displayed user info.
+      document.getElementById('user-info').innerHTML = '';
+      // Hide Logout and Dashboard buttons.
+      document.getElementById('logout-btn').style.display = 'none';
+      document.getElementById('dashboard-btn').style.display = 'none';
+      // Re-render the Google Sign-In button:
+      document.getElementById('google-signin-button').style.display = 'block';
+      google.accounts.id.renderButton(
+          document.getElementById('google-signin-button'),
+          { theme: "outline", size: "large" }
+      );
     });
 
     // Dashboard button: calls the Python API and displays returned JSON.
@@ -72,7 +82,7 @@
         alert('You must be logged in to access the dashboard.');
         return;
       }
-      fetch('/api/dashboard', {
+      fetch('http://localhost:5000/api/dashboard', {
         method: 'GET',
         headers: { 'Authorization': authToken }
       })

@@ -1,12 +1,14 @@
 from flask import Flask, jsonify, request, abort
+from flask_cors import CORS  # Import flask-cors
 from google.oauth2 import id_token
 from google.auth.transport import requests as grequests
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS
 
 # Static user data for 5 users mapped by their email addresses.
 registered_users = {
-    "user1@example.com": {
+    "xyz1@gmail.com": {
         "username": "User1",
         "address": "100 First St, CityA",
         "phone": "111-111-1111"
@@ -47,11 +49,9 @@ def dashboard():
         user_email = idinfo.get("email")
         if not user_email or user_email not in registered_users:
             abort(401, description="User not registered")
-        # Return the registered user info in JSON format.
         return jsonify(registered_users[user_email])
     except ValueError:
         abort(401, description="User not authenticated")
 
 if __name__ == '__main__':
-    # For local testing, run on default port 5000.
-    app.run(debug=True)
+    app.run(debug=True, port=5000)

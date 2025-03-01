@@ -1,4 +1,3 @@
-
 # Detailed Explanation of How the App Works
 
 This application is a simple demonstration of a direct ID token flow using Google Identity Services for authentication and a Flask backend to serve protected user information. The app consists of two main components: a client-side HTML/JavaScript file (`index.html`) and a server-side Python file (`app.py`).
@@ -7,103 +6,221 @@ This application is a simple demonstration of a direct ID token flow using Googl
 
 ## Client-Side (index.html)
 
-1. **Loading the Google Identity Services Library:**
-   - The HTML includes a script tag that loads the Google Identity Services library.
-   - This library enables the app to use the Google Sign-In functionality directly in the browser.
+Below is the revised `index.html` code:
 
-2. **Initializing Google Identity Services:**
-   - In the `window.onload` function, the app initializes Google Identity Services using `google.accounts.id.initialize({ ... })` with:
-     - The `client_id`: This identifies your app to Google and should match the Authorized JavaScript origins (e.g., `http://localhost:5000`).
-     - The `callback`: When the user successfully signs in, the function `handleCredentialResponse` is invoked with the returned ID token.
-   - The app then renders a visible Google Sign-In button by calling `google.accounts.id.renderButton(...)` in an element designated for the sign-in button.
+```html
+<!-- filepath: /home/srinman/git/oauth/scenario1/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OAuth Dashboard</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    /* Initially hide the Logout and Dashboard buttons */
+    #logout-btn, #dashboard-btn {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Display a title on top of the page -->
+  <h1 style="text-align:center;">Welcome to Scenario1 App</h1>
 
-3. **Login Button Behavior:**
-   - The **Login with Google** button toggles between sign-in and logout.
-   - When the user is not authenticated:
-     - Clicking the button simulates a click on the rendered Google sign-in button. This triggers the Google authentication flow.
-   - When the authentication is successful:
-     - The `handleCredentialResponse` function receives an ID token (JWT).
-     - The token is stored in a variable (`authToken`) and the user is marked as authenticated (`isAuthenticated = true`).
-     - The button text is updated to display "logout" followed by the user's name (extracted from the token payload).
-   - When the user chooses to log out:
-     - The authentication flag is reset, the token is cleared, and the UI returns to its initial state.
+  <!-- When not logged in, only this container is visible -->
+  <div id="google-signin-button" style="margin-top:10px;"></div>
 
-4. **Dashboard Button Behavior:**
-   - When the **Dashboard** button is clicked:
-     - If the user is authenticated, the app sends a `GET` request to the `/api/dashboard` endpoint of the Flask backend. The ID token is included in the `Authorization` header.
-     - The response from the backend (user data in JSON format) is then displayed on the page in a formatted `<pre>` block.
-   - If the user is not authenticated, an alert is shown indicating that login is required.
+  <!-- When logged in, these buttons will be displayed -->
+  <button id="logout-btn">Logout</button>
+  <button id="dashboard-btn">Dashboard</button>
+  <div id="user-info"></div>
+
+  <script>
+    let isAuthenticated = false;
+    let authToken = null;
+
+    // Initialize Google Identity Services
+    window.onload = function() {
+      google.accounts.id.initialize({
+        client_id: "573154595273-f5anosm6qld1mg1vgqqiv7rdvvp5p6sm.apps.googleusercontent.com",
+        callback: handleCredentialResponse
+      });
+      // Render the Google Sign-In button within our container.
+      google.accounts.id.renderButton(
+          document.getElementById('google-signin-button'),
+          { theme: "outline", size: "large" }
+      );
+    };
+
+    // Callback function triggered after Google sign-in.
+    function handleCredentialResponse(response) {
+      authToken = response.credential;
+      isAuthenticated = true;
+      
+      // Decode token payload to extract user info.
+      const payload = JSON.parse(atob(authToken.split('.')[1]));
+      const userName = payload.name || payload.email;
+      
+      // Hide the sign-in button container.
+      document.getElementById('google-signin-button').style.display = 'none';
+      // Show Logout and Dashboard buttons.
+      document.getElementById('logout-btn').style.display = 'inline-block';
+      document.getElementById('dashboard-btn').style.display = 'inline-block';
+      // Optionally update Logout button text to include the username.
+      document.getElementById('logout-btn').textContent = 'Logout ' + userName;
+    }
+    window.handleCredentialResponse = handleCredentialResponse;
+
+    // Logout button functionality.
+    document.getElementById('logout-btn').addEventListener('click', function() {
+      // Reset authentication state.
+      isAuthenticated = false;
+      authToken = null;
+      // Clear any displayed user info.
+      document.getElementById('user-info').innerHTML = '';
+      // Hide Logout and Dashboard buttons.
+      document.getElementById('logout-btn').style.display = 'none';
+      document.getElementById('dashboard-btn').style.display = 'none';
+      // Re-render the Google Sign-In button.
+      document.getElementById('google-signin-button').style.display = 'block';
+      google.accounts.id.renderButton(
+          document.getElementById('google-signin-button'),
+          { theme: "outline", size: "large" }
+      );
+    });
+
+    // Dashboard button: calls the Python API and displays returned JSON.
+    document.getElementById('dashboard-btn').addEventListener('click', function() {
+      if (!isAuthenticated) {
+        alert('You must be logged in to access the dashboard.');
+        return;
+      }
+      fetch('http://localhost:5000/api/dashboard', {
+        method: 'GET',
+        headers: { 'Authorization': authToken }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Error fetching dashboard information');
+        }
+        return response.json();
+      })
+      .then(data => {
+        displayUserInfo(data);
+      })
+      .catch(error => {
+        alert(error.message);
+      });
+    });
+
+    // Display the JSON payload in a formatted <pre> block.
+    function displayUserInfo(data) {
+      document.getElementById('user-info').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    }
+  </script>
+</body>
+</html>
+```
 
 ---
 
 ## Server-Side (app.py)
 
-1. **Flask App Setup:**
-   - The Flask app is initialized and sets up an endpoint `/api/dashboard`.
+Below is the revised `app.py` code with CORS enabled:
 
-2. **Static User Data:**
-   - The app contains a dictionary (`registered_users`) with static details for five users. These users are mapped by their email addresses.
+```python
+# filepath: /home/srinman/git/oauth/scenario1/app.py
+from flask import Flask, jsonify, request, abort
+from flask_cors import CORS  # Enable Cross-Origin Resource Sharing
+from google.oauth2 import id_token
+from google.auth.transport import requests as grequests
 
-3. **Token Verification and Protected Endpoint:**
-   - The `/api/dashboard` route expects an HTTP header named `Authorization` that contains the Google ID token.
-   - The app uses the `google.oauth2.id_token.verify_oauth2_token` function to verify the token:
-     - This function confirms the token’s integrity and ensures that it was issued for your client ID.
-   - Once verified, the email is extracted from the token's payload.
-   - The server then checks whether the email exists in the `registered_users` dictionary:
-     - If found, it returns the corresponding user details in JSON format.
-     - Otherwise, it returns an HTTP 401 error indicating that the user is not registered/authorized.
+app = Flask(__name__)
+CORS(app)  # Enable CORS
 
-4. **Error Handling:**
-   - Errors such as a missing token or an invalid token (via the `ValueError` exception) cause the endpoint to return a 401 Unauthorized response with an appropriate message.
+# Static user data for 5 users mapped by their email addresses.
+registered_users = {
+    "xyz1@gmail.com": {
+        "username": "User1",
+        "address": "100 First St, CityA",
+        "phone": "111-111-1111"
+    },
+    "user2@example.com": {
+        "username": "User2",
+        "address": "200 Second St, CityB",
+        "phone": "222-222-2222"
+    },
+    "user3@example.com": {
+        "username": "User3",
+        "address": "300 Third St, CityC",
+        "phone": "333-333-3333"
+    },
+    "user4@example.com": {
+        "username": "User4",
+        "address": "400 Fourth St, CityD",
+        "phone": "444-444-4444"
+    },
+    "user5@example.com": {
+        "username": "User5",
+        "address": "500 Fifth St, CityE",
+        "phone": "555-555-5555"
+    }
+}
 
----
+# Replace with your actual Google client ID.
+GOOGLE_CLIENT_ID = "573154595273-f5anosm6qld1mg1vgqqiv7rdvvp5p6sm.apps.googleusercontent.com"
 
-## Authentication Details and Flow
+@app.route('/api/dashboard', methods=['GET'])
+def dashboard():
+    token = request.headers.get('Authorization')
+    if not token:
+        abort(401, description="Missing authorization token")
+    try:
+        # Verify the token using Google's public keys.
+        idinfo = id_token.verify_oauth2_token(token, grequests.Request(), GOOGLE_CLIENT_ID)
+        user_email = idinfo.get("email")
+        if not user_email or user_email not in registered_users:
+            abort(401, description="User not registered")
+        return jsonify(registered_users[user_email])
+    except ValueError:
+        abort(401, description="User not authenticated")
 
-- **Direct ID Token Flow:**
-  - This flow uses Google Identity Services to handle user sign-in on the client side. The client receives an ID token (a JWT) directly from Google upon successful login.
-  - The token is then sent to the backend, where its signature and claims (such as email) are verified using Google's public keys.
-  - Since this flow doesn’t involve a redirection to a custom `/callback` URL or an authorization code exchange, no client secret is needed on the client side.
-  - The app must ensure that the "Authorized JavaScript origins" in the Google Cloud Console (for example, `http://localhost:5000`) match the URL from which the HTML page is served.
-
-- **Security Emphasis:**
-  - The token verification on the backend is crucial to ensure that the ID token was indeed issued by Google for your application.
-  - By checking the user’s email against a static list of registered users, the app enforces its own access control layer.
-  - This method avoids storing sensitive authentication details (like passwords) and leverages Google’s secure OAuth infrastructure.
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
+```
 
 ---
 
 ## Running the App
 
 1. **Install Dependencies:**
+
    ```bash
-   pip install flask google-auth
+   pip install flask google-auth flask-cors
    ```
 
 2. **Serve the HTML File:**
    - Navigate to the project directory and run:
+   
      ```bash
      python3 -m http.server 8000
      ```
+   
    - This serves your `index.html` at [http://localhost:8000](http://localhost:8000).
 
 3. **Run the Flask Backend:**
+    In python program, change one of the email address to your email address.  For eg. user5@example.com to your email address (Google).
    - In a separate terminal, run:
+   
      ```bash
      python app.py
      ```
-   - The Flask app will run on [http://localhost:5001](http://localhost:5001) (or the configured port).
+   
+   - The Flask app will run on [http://localhost:5000](http://localhost:5000).
 
 4. **Test the Workflow:**
-   - Open your browser and navigate to the HTML page.
-   - Click the **Login with Google** button to sign in.
-   - Upon successful sign-in, click the **Dashboard** button to fetch and display user data from the backend.
+   - Open your browser and navigate to [http://localhost:8000](http://localhost:8000).
+   - Click the rendered Google Sign-In button to log in.
+   - Once logged in, use the Dashboard button to fetch and display your protected user information from the backend.
 
-This detailed overview should help you understand how the app ties together the client-side authentication with the secure backend verification.
-
-
-# Test notes  
-pip install flask google-auth
-python3 -m http.server 8000
-python app.py
-
+   This setup allows you to see how the direct ID token flow works in practice, with a simple user interface and a backend that verifies the token and serves user-specific data. It uses a trusted third-party identity provider (Google) to authenticate users and a custom backend to manage user data securely.
