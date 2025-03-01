@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OAuth Dashboard with Microsoft EntraID</title>
+  <!-- Load MSAL.js from Microsoft -->
+  <script type="text/javascript" src="https://alcdn.msauth.net/browser/2.28.2/js/msal-browser.min.js"></script>
+  <style>
+    /* Initially hide Logout and Dashboard buttons */
+    #logout-btn, #dashboard-btn {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Display a title on top of the page -->
+  <h1 style="text-align:center;">Welcome to Scenario1 App</h1>
+
+  <!-- Sign in, logout and dashboard buttons -->
+  <button id="ms-signin-button">Login with Microsoft</button>
+  <button id="logout-btn">Logout</button>
+  <button id="dashboard-btn">Dashboard</button>
+  <div id="user-info"></div>
+
+  <script>
+    // MSAL configuration: update with your registered Microsoft EntraID app details.
+    const msalConfig = {
+      auth: {
+        clientId: "YOUR_MICROSOFT_CLIENT_ID",
+        authority: "https://login.microsoftonline.com/YOUR_TENANT_ID",
+        redirectUri: "http://localhost:8000"
+      }
+    };
+
+    const msalInstance = new msal.PublicClientApplication(msalConfig);
+    let idToken = null;
+
+    // Sign in using a popup.
+    function signIn() {
+      msalInstance.loginPopup().then((loginResponse) => {
+        idToken = loginResponse.idToken;
+        // Update the UI: hide the sign-in button, show logout and dashboard.
+        document.getElementById('ms-signin-button').style.display = 'none';
+        document.getElementById('logout-btn').style.display = 'inline-block';
+        document.getElementById('dashboard-btn').style.display = 'inline-block';
+        // Decode token payload to extract a user property.
+        const payload = JSON.parse(atob(idToken.split('.')[1]));
+        const userName = payload.preferred_username || payload.name || payload.upn;
+        document.getElementById('logout-btn').textContent = 'Logout ' + userName;
+      }).catch((error) => {
+        console.error("Login failed:", error);
+      });
+    }
+
+    // Sign out using a popup.
+    function signOut() {
+      msalInstance.logoutPopup().then(() => {
+        idToken = null;
+        document.getElementById('logout-btn').style.display = 'none';
+        document.getElementById('dashboard-btn').style.display = 'none';
+        document.getElementById('ms-signin-button').style.display = 'inline-block';
+        document.getElementById('user-info').innerHTML = '';
+      }).catch((error) => {
+        console.error("Logout failed:", error);
+      });
+    }
+
+    document.getElementById('ms-signin-button').addEventListener('click', signIn);
+    document.getElementById('logout-btn').addEventListener('click', signOut);
+
+    // Dashboard button: calls the backend API and displays returned JSON.
+    document.getElementById('dashboard-btn').addEventListener('click', function() {
+      if (!idToken) {
+        alert("You must be signed in to access the dashboard.");
+        return;
+      }
+      fetch('http://localhost:5000/api/dashboard', {
+        method: 'GET',
+        headers: { 'Authorization': idToken }
+      })
+      .then(response => {
+        if (!response.ok) throw new Error("Error fetching dashboard info");
+        return response.json();
+      })
+      .then(data => {
+        document.getElementById('user-info').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      })
+      .catch(error => {
+        alert(error.message);
+      });
+    });
+  </script>
+</body>
+</html>
